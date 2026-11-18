@@ -1,0 +1,14 @@
+:root {
+  --rarity-common: #9CA3AF;
+  --rarity-rare: #4A9EFF;
+  --rarity-epic: #A855F7;
+  --rarity-legendary: #F59E0B;
+  --bg-base: #0D0D12;
+  --bg-elevated: #17171F;
+}
+
+body {
+  background: var(--bg-base);
+  color: #fff;
+  overscroll-behavior: none;
+}

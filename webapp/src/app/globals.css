@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --bg-base: #0a0e17;
+  --bg-elevated: #131824;
+  --bg-card: #1a2030;
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+}
+
+body {
+  background: var(--bg-base);
+  color: #e5e7eb;
+  overscroll-behavior: none;
+}
+
+/* Редкости CS2 */
+:root {
+  --rarity-consumer: #b0c3d9;
+  --rarity-industrial: #5e98d9;
+  --rarity-milspec: #4b69ff;
+  --rarity-restricted: #8847ff;
+  --rarity-classified: #d32ce6;
+  --rarity-covert: #eb4b4b;
+  --rarity-rare: #ffd700;
+  --rarity-contraband: #ff8c00;
+}
+
+@keyframes case-glow-1 {
+  0%, 100% { transform: translateX(-10%) translateY(-10%) scale(1); }
+  50% { transform: translateX(10%) translateY(10%) scale(1.1); }
+}
+@keyframes case-glow-2 {
+  0%, 100% { transform: translateX(10%) translateY(-10%) scale(1.1); }
+  50% { transform: translateX(-10%) translateY(10%) scale(1); }
+}
+@keyframes case-glow-3 {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+}
+
+.case-glow-0 { animation: case-glow-1 6s ease-in-out infinite; }
+.case-glow-1 { animation: case-glow-2 7s ease-in-out infinite; }
+.case-glow-2 { animation: case-glow-3 8s ease-in-out infinite; }
+.case-glow-3 { animation: case-glow-1 9s ease-in-out infinite; }
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

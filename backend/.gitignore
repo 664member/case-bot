@@ -1,0 +1,10 @@
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/logs/
+webapp/node_modules/
+webapp/.next/
+webapp/.env.local
+.vscode/
+*.log

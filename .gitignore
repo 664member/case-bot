@@ -1,0 +1,28 @@
+# Секреты
+backend/.env
+webapp/.env.local
+.env
+*.pem
+*.key
+
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/logs/
+backend/static/images/
+**/__pycache__/
+*.pyc
+
+# Node
+webapp/node_modules/
+webapp/.next/
+webapp/out/
+npm-debug.log*
+
+# Прочее
+.vscode/
+.idea/
+.DS_Store
+*.log
+test.html
