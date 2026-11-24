@@ -28,6 +28,10 @@ export interface ApiProfile {
   balance: number;
   streak: number;
   season_name: string;
+  total_cases_opened: number;
+  favorite_case: string | null;
+  best_drop_price: number;
+  best_drop_name: string | null;
 }
 
 export interface ApiDrop {
