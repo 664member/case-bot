@@ -53,10 +53,12 @@ async def tick(bot: Bot):
     now = datetime.now(timezone.utc)
     async with SessionLocal() as session:
         # 1. Запуск турниров по шаблонам
+        # Важно: не фильтруем по is_recurring.
+        # Повторяющиеся шаблоны всегда имеют next_start_at, а разовые (custom)
+        # тоже должны стартовать один раз — им next_start_at обнуляется после старта.
         templates = (await session.execute(
             select(TournamentTemplate).where(
                 TournamentTemplate.is_active.is_(True),
-                TournamentTemplate.is_recurring.is_(True),
                 TournamentTemplate.next_start_at.is_not(None),
                 TournamentTemplate.next_start_at <= now,
             )

@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ["need-guidelines-medication-influenced.trycloudflare.com"],
+  allowedDevOrigins: ["yale-strange-bytes-card.trycloudflare.com"],
   devIndicators: false,
   async rewrites() {
     return [

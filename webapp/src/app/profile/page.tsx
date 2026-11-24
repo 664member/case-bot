@@ -83,7 +83,21 @@ export default function Profile() {
         <div>Username: @{p?.username ?? "—"}</div>
         <div>Баланс: <span className="text-amber-400">{p?.balance ?? "..."} 🪙</span></div>
         <div>Streak: {p?.streak ?? 0} дней</div>
-        <div>Сезон: {p?.season_name ?? "..."}</div>
+        <div className="flex justify-between">
+          <span className="text-zinc-400">Открыто кейсов:</span>
+          <span className="text-amber-400 font-bold">{p?.total_cases_opened ?? 0}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-zinc-400">Любимый кейс:</span>
+          <span className="text-zinc-100">{p?.favorite_case ?? "—"}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-zinc-400">Самый дорогой дроп:</span>
+          <span className="text-amber-400 font-bold text-right">
+            {p?.best_drop_name ?? "—"} {p?.best_drop_price ? `(${p.best_drop_price} 🪙)` : ""}
+          </span>
+        </div>
+        
       </div>
 
 

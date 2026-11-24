@@ -48,6 +48,12 @@ class UserSeasonStats(Base):
     streak_days: Mapped[int] = mapped_column(Integer, default=0)
     last_daily_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_quality_score: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_cases_opened: Mapped[int] = mapped_column(Integer, default=0)
+    favorite_case_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    favorite_case_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    best_drop_price: Mapped[int] = mapped_column(Integer, default=0)
+    best_drop_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    stats_reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Case(Base):
@@ -60,6 +66,11 @@ class Case(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # NEW: лимитированный кейс
+    is_limited: Mapped[bool] = mapped_column(Boolean, default=False)
+    limit_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    limit_period_hours: Mapped[int] = mapped_column(Integer, default=24)
 
     items: Mapped[list["CaseItem"]] = relationship(back_populates="case", cascade="all, delete-orphan")
 

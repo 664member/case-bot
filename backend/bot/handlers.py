@@ -30,6 +30,7 @@ from bot.keyboards import (
     items_keyboard, confirm_keyboard, rarity_keyboard, rarity_keyboard_for_item,
     edit_case_keyboard, item_list_keyboard, item_menu_keyboard, item_delete_confirm_keyboard,
     edit_tour_keyboard, activity_config_keyboard, RARITIES,
+    limited_case_keyboard,
 )
 from services.activity_service import (
     reward_comment, reward_subscription, reward_referral,
@@ -203,7 +204,8 @@ async def cmd_help(message: Message):
             "<code>/rewards</code> — очки за комментарии/подписку/реферал, лимиты, кулдауны\n"
             "<code>/quality</code> — качество дропов (Float): шансы FN/MW/FT/WW/BS, множители стоимости, StatTrak\n"
             "<code>/wipeinventory</code> — очистить инвентарь ВСЕХ пользователей (admin)\n"
-            "<code>/wipebalance [значение]</code> — обнулить баланс ВСЕХ пользователей и установить [новый баланс] \n\n"
+            "<code>/wipebalance [значение]</code> — обнулить баланс ВСЕХ пользователей и установить [новый баланс] \n"
+            "<code>/wipestats [user_id]</code> — сбросить статистику (всем или одному) (admin)\n\n"
             "<b>Рефералы</b>\n"
             "<code>/ref</code> — персональная инвайт-ссылка в группу\n\n"
             "<b>Рассылка</b>\n"
@@ -535,8 +537,7 @@ async def cmd_newcase(message: Message, state: FSMContext):
     await state.clear()
     await state.update_data(items=[])
     await state.set_state(NewCaseStates.name)
-    await message.answer("📦 Создание кейса\n\nШаг 1/4: введите название кейса (до 64 символов).\n\n/cancel — отмена")
-
+    await message.answer("📦 Создание кейса\n\nШаг 1/5: введите название кейса (до 64 символов).\n\n/cancel — отмена")
 
 @router.message(NewCaseStates.name)
 async def newcase_name(message: Message, state: FSMContext):
@@ -550,7 +551,7 @@ async def newcase_name(message: Message, state: FSMContext):
         return
     await state.update_data(name=name)
     await state.set_state(NewCaseStates.price)
-    await message.answer("Шаг 2/4: введите цену открытия в очках (целое число > 0)\n\n/cancel — отмена")
+    await message.answer("Шаг 2/4: введите цену открытия в очках (целое число >= 0)\n\n/cancel — отмена")
 
 
 @router.message(NewCaseStates.price)
@@ -561,20 +562,81 @@ async def newcase_price(message: Message, state: FSMContext):
         return
     try:
         price = int((message.text or "").strip())
-        if price <= 0:
+        if price < 0:
             raise ValueError
     except ValueError:
-        await message.answer("Цена должна быть целым числом > 0")
+        await message.answer("Цена должна быть целым числом ≥ 0 (0 — бесплатный кейс)")
         return
     await state.update_data(price=price)
-    await state.set_state(NewCaseStates.items)
+    await state.set_state(NewCaseStates.is_limited)
     await message.answer(
-        "Шаг 3/4: добавьте предметы.\n\n"
+        "Шаг 2/5: этот кейс лимитированный?\n"
+        "Лимитированный — можно открыть N раз за период (например, 3 раза за 24 часа).\n\n/cancel — отмена",
+        reply_markup=limited_case_keyboard(),
+    )
+
+
+@router.callback_query(F.data == "newcase:limited_yes")
+async def newcase_limited_yes(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(is_limited=True)
+    await state.set_state(NewCaseStates.limit_attempts)
+    await callback.answer()
+    await callback.message.answer("Сколько раз можно открыть кейс? (целое число > 0)\n\n/cancel — отмена")
+
+
+@router.callback_query(F.data == "newcase:limited_no")
+async def newcase_limited_no(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(is_limited=False, limit_attempts=0, limit_period=24)
+    await state.set_state(NewCaseStates.items)
+    await callback.answer()
+    await callback.message.answer(
+        "Шаг 3/5: добавьте предметы.\n\n"
         "Нажмите «Добавить предмет» и следуйте подсказкам. Минимум 1 предмет.\n"
         "Когда закончите — «Завершить создание».",
         reply_markup=items_keyboard(),
     )
 
+
+@router.message(NewCaseStates.limit_attempts)
+async def newcase_limit_attempts(message: Message, state: FSMContext):
+    if message.text == "/cancel":
+        await state.clear()
+        await message.answer("❌ Отменено")
+        return
+    try:
+        n = int((message.text or "").strip())
+        if n <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("Количество попыток — целое число > 0")
+        return
+    await state.update_data(limit_attempts=n)
+    await state.set_state(NewCaseStates.limit_period)
+    await message.answer("Через сколько часов лимит сбрасывается? (целое число > 0, например 24)\n\n/cancel — отмена")
+
+
+@router.message(NewCaseStates.limit_period)
+async def newcase_limit_period(message: Message, state: FSMContext):
+    if message.text == "/cancel":
+        await state.clear()
+        await message.answer("❌ Отменено")
+        return
+    try:
+        n = int((message.text or "").strip())
+        if n <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("Период — целое число часов > 0")
+        return
+    await state.update_data(limit_period=n)
+    await state.set_state(NewCaseStates.items)
+    data = await state.get_data()
+    attempts = data.get("limit_attempts", 0)
+    await message.answer(
+        f"Шаг 3/5: лимит — {attempts} попыток, сброс каждые {n} ч.\n\n"
+        "Теперь добавьте предметы.",
+        reply_markup=items_keyboard(),
+    )
 
 @router.callback_query(F.data == "newcase:add_item")
 async def newcase_add_item(callback: CallbackQuery, state: FSMContext):
@@ -665,13 +727,26 @@ async def newcase_finish(callback: CallbackQuery, state: FSMContext):
     if not items:
         await callback.answer("Добавьте хотя бы один предмет", show_alert=True)
         return
+        
     name = data.get("name", "?")
     price = data.get("price", 0)
+    is_limited = data.get("is_limited", False)
+    limit_attempts = data.get("limit_attempts", 0)
+    limit_period = data.get("limit_period", 24)
+    
+    # Формируем строку с ценой и лимитом
+    price_str = f"{price} 🪙" if price > 0 else "Бесплатно (0 🪙)"
+    limit_str = ""
+    if is_limited:
+        limit_str = f"\n🔒 Лимит: {limit_attempts} попыток / {limit_period} ч."
+    
     total_weight = sum(i["weight"] for i in items)
-    lines = [f"📦 <b>{name}</b> — {price} очков", "", "Предметы:"]
+    lines = [f"📦 <b>{name}</b> — {price_str}{limit_str}", "", "Предметы:"]
+    
     for i in items:
         chance = i["weight"] / total_weight * 100
-        lines.append(f"• {i['name']} ({i['rarity']}) — {chance:.1f}% — награда {i['point_value']}")
+        lines.append(f"• {i['name']} ({i['rarity']}) — {chance:.1f}% — награда {i['point_value']} 🪙")
+        
     lines.append("\nСоздать кейс?")
     await state.set_state(NewCaseStates.confirm)
     await callback.answer()
@@ -698,7 +773,11 @@ async def newcase_confirm(callback: CallbackQuery, state: FSMContext):
             price_points=price,
             is_active=True,
             created_by=callback.from_user.id,
+            is_limited=data.get("is_limited", False),
+            limit_attempts=data.get("limit_attempts", 0),
+            limit_period_hours=data.get("limit_period", 24),
         )
+
         session.add(case)
         await session.flush()
 
@@ -3195,3 +3274,49 @@ async def wipebalance_cancel(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Отменено")
     await callback.message.answer("❌ Операция отменена.")
+
+@router.message(Command("wipestats"))
+async def cmd_wipestats(message: Message, command: CommandObject):
+    """Сбросить статистику (всем или конкретному id).
+    /wipestats — всем
+    /wipestats <user_id> — конкретному"""
+    async with SessionLocal() as session:
+        role = await get_role(session, message.from_user.id)
+        if not is_admin(role):
+            await message.answer("⛔ Только для админа")
+            return
+        season = await get_active_season(session)
+        if not season:
+            await message.answer("Нет активного сезона")
+            return
+
+        now = datetime.now(timezone.utc)
+
+        if command.args:
+            try:
+                target_id = int(command.args.strip())
+            except ValueError:
+                await message.answer("user_id должен быть числом")
+                return
+            stats = (await session.execute(
+                select(UserSeasonStats).where(
+                    UserSeasonStats.user_id == target_id,
+                    UserSeasonStats.season_id == season.id,
+                )
+            )).scalar_one_or_none()
+            if not stats:
+                await message.answer("Профиль не найден")
+                return
+
+            stats.stats_reset_at = now
+            await session.commit()
+            await message.answer(f"✅ Статистика пользователя <code>{target_id}</code> сброшена (счёт пойдёт заново)", parse_mode="HTML")
+        else:
+            from sqlalchemy import update as sa_update
+            await session.execute(
+                sa_update(UserSeasonStats)
+                .where(UserSeasonStats.season_id == season.id)
+                .values(stats_reset_at=now)
+            )
+            await session.commit()
+            await message.answer("✅ Статистика ВСЕХ пользователей сброшена (счёт пойдёт заново)")

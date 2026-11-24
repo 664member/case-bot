@@ -20,6 +20,7 @@ export default function CaseDetailPage() {
   const [roundKey, setRoundKey] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [selling, setSelling] = useState(false);
+  const [errorModal, setErrorModal] = useState<string | null>(null);
 
   useEffect(() => {
     api.getCases().then((list) => {
@@ -43,6 +44,12 @@ export default function CaseDetailPage() {
     haptic("medium");
     try {
       const result = await api.openCase(c.id);
+      if (c.is_limited && c.remaining_attempts !== null) {
+        setC({
+          ...c,
+          remaining_attempts: Math.max(0, c.remaining_attempts - 1),
+        });
+      }
       const winnerItem: CaseItem = {
         id: String(result.item_id),
         name: result.item_name,
@@ -57,7 +64,7 @@ export default function CaseDetailPage() {
       setRoundKey(Date.now());
     } catch (e: any) {
       setRolling(false);
-      alert(e.message);
+       setErrorModal(e.message);
     }
   };
 
@@ -130,16 +137,28 @@ export default function CaseDetailPage() {
           )}
         </div>
         <h1 className="text-2xl font-bold text-center">{c.name}</h1>
+        {c.is_limited && c.remaining_attempts !== null && (
+          <div className="text-sm text-zinc-400">
+            Осталось:{" "}
+            <span className="text-amber-400 font-bold">
+              {c.remaining_attempts}/{c.limit_attempts}
+            </span>
+          </div>
+        )}        
         <div className="text-amber-400 font-bold text-sm">{c.price} 🪙</div>
         <div className="text-xs text-zinc-500">Баланс: {balance ?? "..."} 🪙</div>
       </div>
 
       <button
         onClick={openCase}
-        disabled={rolling}
+        disabled={rolling || (c.is_limited && c.remaining_attempts === 0)}
         className="w-full bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl py-3 font-bold active:scale-95 transition-transform disabled:opacity-50"
       >
-        {rolling ? "Крутим..." : `Открыть за ${c.price} 🪙`}
+        {c.is_limited && c.remaining_attempts === 0
+          ? "Лимит исчерпан"
+          : rolling
+          ? "Крутим..."
+          : `Открыть за ${c.price} 🪙`}
       </button>
 
       {(rolling || winner) && (
@@ -191,6 +210,31 @@ export default function CaseDetailPage() {
                 className="flex-1 bg-amber-600 rounded-lg py-2 font-bold active:scale-95 transition-transform disabled:opacity-50"
               >
                 {selling ? "..." : "Продать"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {errorModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#131824] rounded-2xl p-6 text-center max-w-xs w-full border border-zinc-800">
+            <div className="text-4xl mb-3">🔒</div>
+            <div className="text-zinc-200 text-sm mb-6">{errorModal}</div>
+            <div className="flex flex-col gap-2">
+              <a
+                href={process.env.NEXT_PUBLIC_CHANNEL_LINK || "https://t.me/"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full block bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg py-2.5 font-bold text-sm text-white active:scale-95 transition-transform"
+              >
+                📢 Подписаться
+              </a>
+              <button
+                onClick={() => setErrorModal(null)}
+                className="w-full bg-zinc-800 rounded-lg py-2 text-sm active:scale-95 transition-transform"
+              >
+                Закрыть
               </button>
             </div>
           </div>

@@ -152,6 +152,44 @@ async def get_or_create_invite_link(user_id: int) -> str | None:
 async def profile(payload: ProfilePayload, session: AsyncSession = Depends(get_session)):
     user_data = verify_init_data(payload.initData)
     user, season, stats = await get_or_create_user_and_season(session, user_data)
+
+    # Определяем точку отсчета для статистики
+    reset_filter = []
+    if stats.stats_reset_at:
+        reset_filter.append(Drop.rolled_at >= stats.stats_reset_at)
+
+    # 1. Количество открытых кейсов
+    total_opened = (await session.execute(
+        select(func.count(Drop.id)).where(
+            Drop.user_id == user.id, 
+            Drop.season_id == season.id,
+            *reset_filter
+        )
+    )).scalar_one() or 0
+
+    # 2. Любимый кейс
+    fav_case_row = (await session.execute(
+        select(Case.name, func.count(Drop.id).label("cnt"))
+        .join(Drop, Drop.case_id == Case.id)
+        .where(Drop.user_id == user.id, Drop.season_id == season.id, *reset_filter)
+        .group_by(Case.name)
+        .order_by(func.count(Drop.id).desc())
+        .limit(1)
+    )).first()
+    favorite_case_name = fav_case_row[0] if fav_case_row else None
+
+    # 3. Самый дорогой дроп
+    best_drop_row = (await session.execute(
+        select(CaseItem.name, Drop.final_price)
+        .join(CaseItem, Drop.item_id == CaseItem.id)
+        .where(Drop.user_id == user.id, Drop.season_id == season.id, *reset_filter)
+        .order_by(Drop.final_price.desc())
+        .limit(1)
+    )).first()
+    
+    best_drop_name = best_drop_row[0] if best_drop_row else None
+    best_drop_price = best_drop_row[1] if best_drop_row else 0
+
     return {
         "user_id": user.id,
         "username": user.username,
@@ -159,6 +197,10 @@ async def profile(payload: ProfilePayload, session: AsyncSession = Depends(get_s
         "balance": stats.points_balance,
         "streak": stats.streak_days,
         "season_name": season.name,
+        "total_cases_opened": total_opened,
+        "favorite_case": favorite_case_name,
+        "best_drop_price": best_drop_price,
+        "best_drop_name": best_drop_name,
     }
 
 
@@ -219,43 +261,67 @@ async def daily_bonus(payload: DailyBonusPayload, session: AsyncSession = Depend
 
 
 @router.get("/cases")
-async def list_cases(session: AsyncSession = Depends(get_session)):
+async def list_cases(
+    initData: str | None = None,
+    session: AsyncSession = Depends(get_session),
+):
     season = (await session.execute(
         select(Season).where(Season.status == "active").order_by(Season.id.desc())
     )).scalar_one_or_none()
     if not season:
         return {"cases": []}
 
+    user_id = None
+    if initData:
+        try:
+            user_data = verify_init_data(initData)
+            user_id = user_data.get("user", {}).get("id")
+        except Exception:
+            pass
+
     cases = (await session.execute(
         select(Case).where(Case.season_id == season.id, Case.is_active).order_by(Case.id.desc())
     )).scalars().all()
 
+    r = aioredis.from_url(REDIS_URL) if user_id else None
     result = []
-    for c in cases:
-        items = (await session.execute(
-            select(CaseItem).where(
-                CaseItem.case_id == c.id,
-                CaseItem.deleted_at.is_(None),
-            )
-        )).scalars().all()
-        total_weight = sum(it.weight for it in items) or 1
-        result.append({
-            "id": c.id,
-            "name": c.name,
-            "price": c.price_points,
-            "image_url": c.image_url,
-            "items": [
-                {
-                    "id": it.id,
-                    "name": it.name,
-                    "rarity": it.rarity,
-                    "chance": round(it.weight / total_weight * 100, 2),
-                    "pointValue": it.point_value,
-                    "image_url": it.image_url,
-                }
-                for it in items
-            ],
-        })
+    try:
+        for c in cases:
+            items = (await session.execute(
+                select(CaseItem).where(CaseItem.case_id == c.id, CaseItem.deleted_at.is_(None))
+            )).scalars().all()
+            total_weight = sum(it.weight for it in items) or 1
+
+            remaining = None
+            if c.is_limited and c.limit_attempts > 0 and user_id and r:
+                used = int((await r.get(f"case_limit:{user_id}:{c.id}")) or 0)
+                remaining = max(0, c.limit_attempts - used)
+
+            result.append({
+                "id": c.id,
+                "name": c.name,
+                "price": c.price_points,
+                "image_url": c.image_url,
+                "is_limited": bool(c.is_limited),
+                "limit_attempts": c.limit_attempts,
+                "limit_period_hours": c.limit_period_hours,
+                "remaining_attempts": remaining,
+                "items": [
+                    {
+                        "id": it.id,
+                        "name": it.name,
+                        "rarity": it.rarity,
+                        "chance": round(it.weight / total_weight * 100, 2),
+                        "pointValue": it.point_value,
+                        "image_url": it.image_url,
+                    }
+                    for it in items
+                ],
+            })
+    finally:
+        if r:
+            await r.close()
+
     return {"cases": result}
 
 

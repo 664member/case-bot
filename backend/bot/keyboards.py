@@ -119,3 +119,9 @@ def activity_config_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="👥 Очки за реферала", callback_data="actcfg:points_referral")],
         [InlineKeyboardButton(text="🎯 Реферал: после действия (вкл/выкл)", callback_data="actcfg:referral_requires_action")],
     ])
+
+def limited_case_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Да, лимитированный", callback_data="newcase:limited_yes")],
+        [InlineKeyboardButton(text="❌ Нет, обычный", callback_data="newcase:limited_no")],
+    ])

@@ -151,7 +151,10 @@ async def finalize_tournament(session: AsyncSession, tournament: Tournament, bot
 
     if tournament.template_id:
         template = await session.get(TournamentTemplate, tournament.template_id)
-        if template and template.is_active and template.is_recurring:
+        # custom не перезапускаем: _next_start("custom") возвращает "прямо сейчас",
+        # что дало бы бесконечный цикл развёртывания турниров.
+        if (template and template.is_active and template.is_recurring
+                and template.type in ("daily", "weekly", "monthly")):
             template.next_start_at = _next_start(template.type, now)
         elif template:
             template.next_start_at = None

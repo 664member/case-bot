@@ -14,6 +14,10 @@ export interface ApiCase {
   name: string;
   price: number;
   image_url?: string | null;
+  is_limited: boolean;
+  limit_attempts: number;
+  limit_period_hours: number;
+  remaining_attempts: number | null;
   items: ApiCaseItem[];
 }
 
@@ -167,7 +171,10 @@ export function imageUrl(path: string | null | undefined): string | null {
 
 export const api = {
   getProfile: () => post<ApiProfile>("/api/webapp/profile", { initData: getInitData() }),
-  getCases: () => get<{ cases: ApiCase[] }>("/api/webapp/cases").then((r) => r.cases),
+  getCases: () =>
+  get<{ cases: ApiCase[] }>(
+    `/api/webapp/cases?initData=${encodeURIComponent(getInitData())}`
+  ).then((r) => r.cases),
   getFeed: (limit = 20) =>
     get<{ drops: ApiDrop[] }>(`/api/webapp/feed?limit=${limit}`).then((r) => r.drops),
   getLeaderboard: (limit = 10) =>

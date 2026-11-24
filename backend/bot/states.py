@@ -4,6 +4,9 @@ from aiogram.fsm.state import State, StatesGroup
 class NewCaseStates(StatesGroup):
     name = State()
     price = State()
+    is_limited = State()         # NEW
+    limit_attempts = State()     # NEW
+    limit_period = State()       # NEW
     items = State()
     confirm = State()
     add_item_image = State()
